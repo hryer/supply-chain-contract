@@ -5,7 +5,7 @@ contract Lemon {
 
     uint256 skuCount;
 
-    enum State {ForSale, Sold}
+    enum State {ForSale, Sold, Shipped}
 
     struct Item {
         string name;
@@ -21,6 +21,8 @@ contract Lemon {
     event ForSale(uint256 skuCount);
 
     event Sold(uint256 sku);
+
+    event Shipped(uint256 sku);
 
     modifier onlyOwner() {
         require(msg.sender == owner);
@@ -44,6 +46,18 @@ contract Lemon {
 
     modifier sold(uint256 _sku) {
         require(items[_sku].state == State.Sold);
+        _;
+    }
+
+    modifier shipped(uint256 _sku) {
+        require(items[_sku].state == State.Shipped);
+        _;
+    }
+
+    modifier checkValue(uint256 _sku) {
+        uint256 _price = items[_sku].price;
+        uint256 amountToRefund = msg.value - _price;
+        payable(address(items[_sku].buyer)).transfer(amountToRefund);
         _;
     }
 
@@ -72,6 +86,7 @@ contract Lemon {
         payable
         forSale(_sku)
         paidEnough(items[_sku].price)
+        checkValue(_sku)
     {
         address payable buyer = payable(address(msg.sender));
         uint256 price = items[_sku].price;
@@ -107,9 +122,20 @@ contract Lemon {
             stateIs = "For Sale";
         } else if (state == 1) {
             stateIs = "Sold";
+        } else if (state == 2) {
+            stateIs = "Shipped";
         }
 
         seller = items[_sku].seller;
         buyer = items[_sku].buyer;
+    }
+
+    function shipItem(uint256 _sku)
+        public
+        sold(_sku)
+        verifyCaller(items[_sku].seller)
+    {
+        items[_sku].state = State.Shipped;
+        emit Shipped(_sku);
     }
 }
